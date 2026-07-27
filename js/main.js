@@ -50,6 +50,7 @@
     const day = state.currentDay;
     const allDone = day > totalDays;
     const progress = totalDays ? Math.min(100, Math.round((state.completedCount / totalDays) * 100)) : 0;
+    const learnedWords = repo.getLearnedWordCount(state.completedCount);
     const wrongCount = repo.loadWrongNotes().length;
     const results = repo.loadResults();
     const recent = results.slice(-10);
@@ -79,7 +80,7 @@
         '<p class="muted">' + state.completedCount + " / " + totalDays + "일 완료 · " + progress + "%</p>" +
       "</div>" +
       '<div class="stat-row">' +
-        '<div class="stat"><div class="num">' + (state.completedCount * 30) + '</div><div class="lbl">누적 학습 단어</div></div>' +
+        '<div class="stat"><div class="num">' + learnedWords + '</div><div class="lbl">누적 학습 단어</div></div>' +
         '<div class="stat"><div class="num">' + (recentRate === null ? "—" : recentRate + "%") + '</div><div class="lbl">최근 정답률</div></div>' +
         '<div class="stat"><div class="num">' + wrongCount + '</div><div class="lbl">오답노트</div></div>' +
       "</div>" +
@@ -124,6 +125,7 @@
     App.el = document.getElementById("app");
     App.repo = new S.Repository(new S.LocalStorageProvider());
     App.state = App.repo.loadState();
+    App.repo.migrateLegacyAssignments(App.state); // 구버전(순서 배정) 데이터 호환
     App.repo.saveState(App.state); // 최초 실행 시 시작일 기록
     App.navigate("home");
   });

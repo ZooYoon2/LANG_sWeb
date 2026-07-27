@@ -5,6 +5,7 @@
  *   Step2  어제 단어 30개 복습 시험    (Day 2부터)
  *   Step3  오늘 단어 30개 카드 학습
  *   Step4  오늘 단어 30개 암기 시험
+ * 오늘 단어는 시작 시점에 미학습 풀에서 무작위 30개가 배정된다.
  * 주간시험: 7일 완료마다 지금까지 배운 단어 중 랜덤 50개
  * ============================================================ */
 (function () {
@@ -12,6 +13,7 @@
 
   const M = window.Models;
   const Quiz = window.Features.Quiz;
+  const Speech = window.Features.Speech;
 
   function esc(s) {
     const d = document.createElement("div");
@@ -25,7 +27,9 @@
     const state = app.state;
     const day = state.currentDay;
 
-    if (day > repo.getTotalDays()) {
+    // 오늘 단어 배정 (처음이면 무작위 30개 추출, 이후 고정)
+    const todayWords = repo.ensureAssignment(day);
+    if (!todayWords.length) {
       app.el.innerHTML =
         app.topbarHTML("홈") +
         '<h1 class="screen-title">모든 단어를 끝냈습니다!</h1>' +
@@ -105,14 +109,16 @@
             '<span class="p">목록 보기</span></div>' +
             '<div class="card"><ul class="word-list">' +
             words.map(function (w) {
-              return "<li><span class='w'>" + esc(w.word) + "</span><span class='m'>" +
-                (w.pos ? "(" + esc(w.pos) + ") " : "") + esc(w.meaning) + "</span></li>";
+              return "<li>" + Speech.buttonHTML(w.word) +
+                "<span class='w'>" + esc(w.word) + "</span><span class='m'>" +
+                (w.posLabel ? "[" + esc(w.posLabel) + "] " : "") + esc(w.meaning) + "</span></li>";
             }).join("") +
             "</ul></div>" +
             '<div class="btn-row">' +
               '<button class="btn secondary" id="to-cards">카드로 보기</button>' +
               '<button class="btn" id="to-quiz">암기 시험 시작</button>' +
             "</div>";
+          Speech.bindAll(body);
           body.querySelector("#to-cards").addEventListener("click", function () { listMode = false; render(); });
           body.querySelector("#to-quiz").addEventListener("click", next);
           return;
@@ -124,8 +130,9 @@
           '<div class="quiz-head"><span class="t">Day ' + day + " · 오늘 단어 학습</span>" +
           '<span class="p">' + (cardIdx + 1) + " / " + words.length + "</span></div>" +
           '<div class="flashcard" id="fc">' +
-            '<div class="word">' + esc(w.word) + "</div>" +
-            (w.pos ? '<span class="chip pos" style="margin-top:8px">' + esc(w.pos) + "</span>" : "") +
+            '<div class="word-row"><div class="word">' + esc(w.word) + "</div>" + Speech.buttonHTML(w.word) + "</div>" +
+            (w.phonetic ? '<p class="phonetic">' + esc(w.phonetic) + "</p>" : "") +
+            (w.posLabel ? '<span class="chip pos" style="margin-top:8px">' + esc(w.posLabel) + "</span>" : "") +
             (showMeaning
               ? '<div class="meaning"><span class="hl">' + esc(w.meaning) + "</span></div>" +
                 (w.example ? '<p class="hint">' + esc(w.example) + "</p>" : "")
@@ -138,10 +145,10 @@
           "</div>" +
           '<div class="btn-row" style="margin-top:12px">' +
             '<button class="btn ghost" id="to-list">전체 목록</button>' +
-            (last || showMeaning ? "" : "") +
           "</div>" +
           (last ? '<button class="btn" id="to-quiz" style="margin-top:4px">학습 완료 — 암기 시험 시작</button>' : "");
 
+        Speech.bindAll(body);
         body.querySelector("#fc").addEventListener("click", function () {
           showMeaning = !showMeaning; render();
         });

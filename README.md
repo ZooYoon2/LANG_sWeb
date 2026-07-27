@@ -12,7 +12,11 @@
 | 3 | 오늘 단어 30개 카드 학습 | 매일 |
 | 4 | 오늘 단어 30개 암기 시험 | 매일 |
 
+- 오늘의 30개는 **아직 안 배운 단어에서 무작위로** 뽑혀 그날에 고정 배정됩니다.
+  (복습·주간시험 범위가 흔들리지 않도록 한 번 배정되면 바뀌지 않습니다)
 - 시험은 절반 **영→뜻 4지선다**, 절반 **뜻→영 타이핑**으로 출제됩니다.
+- 학습 카드·목록·오답노트·채점 결과에서 🔊 버튼으로 발음을 들을 수 있습니다.
+  (브라우저 내장 음성 사용 — 기기별로 목소리가 다를 수 있습니다)
 - 7일 완료마다 지금까지 배운 단어 중 **랜덤 50문제 주간시험**이 열립니다.
 - 틀린 단어는 **오답노트**에 자동 기록되고, 2회 이상 틀리면 "자주 틀림" 표시가 붙습니다.
   오답 재시험에서 맞히면 횟수가 줄고, 1회짜리는 노트에서 제거됩니다.
@@ -44,9 +48,12 @@
 지원 팩 타입:
 
 ```jsonc
-// 단어 팩 — 마지막 Day 뒤에 30개 단위로 새 Day가 생깁니다
+// 단어 팩 — 미학습 풀에 들어가 이후 학습에 무작위로 등장합니다
+// pos 코드: n(명사) v(동사) adj(형용사) adv(부사) → 화면에는 한글로 표시
+// phonetic(발음 기호), example(예문)은 선택 항목
 { "packType": "words", "title": "추가 단어 팩",
-  "items": [ { "word": "negotiate", "meaning": "협상하다", "pos": "v", "example": "..." } ] }
+  "items": [ { "word": "negotiate", "meaning": "협상하다", "pos": "v",
+               "phonetic": "/nɪˈɡoʊʃieɪt/", "example": "..." } ] }
 
 // 문법 팩 — 라이브러리에서 열람
 { "packType": "grammar", "title": "핵심 문법",
@@ -77,14 +84,31 @@ vocaloop/
     │   ├── local-storage-provider.js  # localStorage 구현체
     │   └── repository.js              # JSON↔클래스 변환, 단어 풀 관리
     ├── features/
+    │   ├── speech.js          # 발음 듣기 (브라우저 내장 음성)
     │   ├── study.js           # 일일 4스텝 플로우, 주간시험
     │   ├── quiz.js            # 문제 생성 + 시험 화면 (공용)
     │   ├── wrongnote.js       # 오답노트, 오답 재시험
     │   ├── content-import.js  # Claude 콘텐츠 팩 가져오기, 라이브러리
     │   └── backup.js          # 백업/복원/초기화
     └── data/
-        └── words.js           # 기본 단어 900개 (Day 1~30)
+        └── words.js           # 기본 단어 900개 (JSON 객체 배열)
 ```
+
+## 데이터 규격 (나중에 DB로 옮길 때)
+
+모든 데이터는 JSON 키:값 규격으로 통일되어 있어 그대로 테이블화할 수 있습니다.
+
+| localStorage 키 | 내용 |
+|---|---|
+| `vocaloop.state` | `{ startDate, completedCount, weeklyDoneCount }` |
+| `vocaloop.assignments` | `{ "1": [단어id...], "2": [...] }` — Day별 배정표 |
+| `vocaloop.wrong` | `[{ itemId, wrongCount, lastWrongDate, sources }]` |
+| `vocaloop.results` | `[{ id, quizType, day, date, score, total, wrongItemIds }]` |
+| `vocaloop.customWords` | `[{ id, word, meaning, pos, phonetic, example, ... }]` |
+| `vocaloop.library` | 문법/토익 항목 배열 |
+
+단어 원본(`js/data/words.js`)도 같은 규격의 JSON 객체 배열입니다:
+`{ "word": "...", "meaning": "...", "pos": "v", "phonetic": "..."(선택) }`
 
 ## 나중에 확장하려면
 

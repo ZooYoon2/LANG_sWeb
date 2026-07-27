@@ -19,13 +19,15 @@
     "VocaLoop 콘텐츠 팩을 만들어줘.\n" +
     "- packType: words (또는 grammar / toeic)\n" +
     "- 토익/토플 빈출 단어 30개, 이미 준 단어와 중복 없이\n" +
-    "- 아래 JSON 형식 그대로, 다른 텍스트 없이 출력\n\n" +
+    "- 아래 JSON 형식 그대로, 다른 텍스트 없이 출력\n" +
+    "- pos 코드: n(명사) v(동사) adj(형용사) adv(부사)\n\n" +
     '{\n  "packType": "words",\n  "title": "추가 단어 팩",\n  "items": [\n' +
-    '    { "word": "negotiate", "meaning": "협상하다", "pos": "v", "example": "We negotiated a better price." }\n' +
+    '    { "word": "negotiate", "meaning": "협상하다", "pos": "v",\n' +
+    '      "phonetic": "/nɪˈɡoʊʃieɪt/", "example": "We negotiated a better price." }\n' +
     "  ]\n}";
 
   const SPEC_TEXT =
-    '// 단어 팩\n{ "packType": "words", "title": "...",\n  "items": [ { "word": "...", "meaning": "...", "pos": "v", "example": "..." } ] }\n\n' +
+    '// 단어 팩 (phonetic·example은 선택)\n{ "packType": "words", "title": "...",\n  "items": [ { "word": "...", "meaning": "...", "pos": "v", "phonetic": "/.../", "example": "..." } ] }\n\n' +
     '// 문법 팩\n{ "packType": "grammar", "title": "...",\n  "items": [ { "title": "...", "explanation": "...", "examples": ["..."] } ] }\n\n' +
     '// 토익 문제 팩\n{ "packType": "toeic", "title": "...",\n  "items": [ { "question": "...", "choices": ["A","B","C","D"], "answer": 0, "explanation": "..." } ] }';
 
@@ -57,7 +59,7 @@
     // 타입별 저장
     if (data.packType === "words") {
       const r = repo.appendWordPack(data.items);
-      return { ok: true, msg: "단어 " + r.added + "개 추가 완료 (Day " + r.fromDay + "~" + r.toDay + "에 배정)" };
+      return { ok: true, msg: "단어 " + r.added + "개 추가 완료. 앞으로의 학습에 무작위로 등장합니다." };
     }
     const stamp = Date.now();
     const items = data.items.map(function (it, i) {

@@ -1,20 +1,37 @@
 /* ============================================================
  * Repository — 데이터 계층
  * 저장소(JSON)와 앱 코드(클래스) 사이의 변환을 전담한다.
- * 단어 풀 = 기본 데이터(words.js) + 사용자가 추가한 단어 팩
+ *
+ * Day 배정 방식:
+ *  - 단어 데이터에는 Day가 없다.
+ *  - Day N을 처음 시작할 때 "아직 배정 안 된 단어" 중 무작위 30개를
+ *    뽑아 배정표(assignments)에 기록하고, 이후에는 고정이다.
+ *    → 복습/주간시험 범위가 흔들리지 않는다.
+ *  - 새 단어 팩은 미배정 풀에 섞여 이후 날짜에 자연스럽게 등장한다.
  * ============================================================ */
 (function () {
   "use strict";
 
   const M = window.Models;
+  const WORDS_PER_DAY = 30;
 
   const KEYS = {
     state: "vocaloop.state",
+    assignments: "vocaloop.assignments", // { "1": ["base-3", ...], "2": [...] }
     wrong: "vocaloop.wrong",
     results: "vocaloop.results",
     customWords: "vocaloop.customWords",
     library: "vocaloop.library", // 문법/토익 등 확장 콘텐츠
   };
+
+  function shuffle(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      const t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
 
   class Repository {
     /** @param {StorageProvider} provider */
@@ -48,19 +65,6 @@
     getAllWords() {
       return this._getBaseWords().concat(this._getCustomWords());
     }
-    /** 특정 Day의 단어 30개 */
-    getWordsForDay(day) {
-      return this.getAllWords().filter((w) => w.day === day);
-    }
-    /** Day 1 ~ maxDay 까지의 단어 */
-    getWordsUpToDay(maxDay) {
-      return this.getAllWords().filter((w) => w.day <= maxDay);
-    }
-    /** 콘텐츠가 존재하는 마지막 Day */
-    getTotalDays() {
-      const all = this.getAllWords();
-      return all.length ? Math.max.apply(null, all.map((w) => w.day)) : 0;
-    }
     /** id → WordEntry 맵 */
     getWordMap() {
       const map = {};
@@ -68,38 +72,104 @@
       return map;
     }
     /**
-     * 단어 팩 추가: 마지막 Day 뒤에 30개 단위로 새 Day를 만들어 배정
-     * @param {Array<Object>} items [{word, meaning, pos, example}]
-     * @returns {{added:number, fromDay:number, toDay:number}}
+     * 단어 팩 추가: 미배정 풀에 넣기만 하면 이후 학습에 무작위 등장
+     * @param {Array<Object>} items [{word, meaning, pos, phonetic, example}]
+     * @returns {{added:number}}
      */
     appendWordPack(items) {
-      const custom = this._getCustomWords();
-      let lastDay = this.getTotalDays();
-      // 마지막 Day가 30개 미만이면 이어서 채운다
-      let countInLastDay = this.getWordsForDay(lastDay).length;
+      const arr = this.provider.get(KEYS.customWords) || [];
       const stamp = Date.now();
-      const newEntries = items.map((it, i) => {
-        if (countInLastDay >= 30 || lastDay === 0) {
-          lastDay += 1;
-          countInLastDay = 0;
-        }
-        countInLastDay += 1;
-        return new M.WordEntry({
+      items.forEach(function (it, i) {
+        arr.push(new M.WordEntry({
           id: "cust-" + stamp + "-" + i,
           word: it.word.trim(),
           meaning: it.meaning.trim(),
           pos: (it.pos || "").trim(),
+          phonetic: (it.phonetic || "").trim(),
           example: (it.example || "").trim(),
-          day: lastDay,
-        });
+        }).toJSON());
       });
-      const merged = custom.concat(newEntries).map((w) => w.toJSON());
-      this.provider.set(KEYS.customWords, merged);
-      return {
-        added: newEntries.length,
-        fromDay: newEntries.length ? newEntries[0].day : 0,
-        toDay: lastDay,
-      };
+      this.provider.set(KEYS.customWords, arr);
+      return { added: items.length };
+    }
+
+    /* ---------- Day 배정표 ---------- */
+    _getAssignments() {
+      return this.provider.get(KEYS.assignments) || {};
+    }
+    _saveAssignments(a) {
+      this.provider.set(KEYS.assignments, a);
+    }
+    /** 배정된 모든 단어 id Set */
+    _assignedIdSet() {
+      const a = this._getAssignments();
+      const set = {};
+      Object.keys(a).forEach(function (day) {
+        a[day].forEach(function (id) { set[id] = true; });
+      });
+      return set;
+    }
+    /** 아직 배정되지 않은 단어들 */
+    getUnassignedWords() {
+      const assigned = this._assignedIdSet();
+      return this.getAllWords().filter(function (w) { return !assigned[w.id]; });
+    }
+    /**
+     * Day N의 배정을 보장한다. 없으면 미배정 풀에서 무작위 30개 추출.
+     * @returns {WordEntry[]} 그날의 단어 (남은 게 없으면 빈 배열)
+     */
+    ensureAssignment(day) {
+      const a = this._getAssignments();
+      if (!a[day]) {
+        const pool = this.getUnassignedWords();
+        if (!pool.length) return [];
+        a[day] = shuffle(pool).slice(0, WORDS_PER_DAY).map(function (w) { return w.id; });
+        this._saveAssignments(a);
+      }
+      return this.getWordsForDay(day);
+    }
+    /** 특정 Day에 배정된 단어 (배정 전이면 빈 배열) */
+    getWordsForDay(day) {
+      const ids = this._getAssignments()[day] || [];
+      const map = this.getWordMap();
+      return ids.map(function (id) { return map[id]; }).filter(Boolean);
+    }
+    /** Day 1 ~ maxDay에 배정된 모든 단어 */
+    getWordsUpToDay(maxDay) {
+      const a = this._getAssignments();
+      const map = this.getWordMap();
+      const out = [];
+      Object.keys(a).forEach(function (day) {
+        if (parseInt(day, 10) <= maxDay) {
+          a[day].forEach(function (id) { if (map[id]) out.push(map[id]); });
+        }
+      });
+      return out;
+    }
+    /** 예상 총 Day 수 = 배정된 날 수 + 남은 단어로 만들 수 있는 날 수 */
+    getTotalDays() {
+      const assignedDays = Object.keys(this._getAssignments()).length;
+      return assignedDays + Math.ceil(this.getUnassignedWords().length / WORDS_PER_DAY);
+    }
+    /** 완료한 날들에 배정됐던 단어 수 (홈 통계용) */
+    getLearnedWordCount(completedCount) {
+      return this.getWordsUpToDay(completedCount).length;
+    }
+
+    /**
+     * 구버전 마이그레이션: 배정표 없이 completedCount만 있으면
+     * (예전 "순서대로 30개" 방식) 그 규칙 그대로 배정표를 만들어 준다.
+     */
+    migrateLegacyAssignments(state) {
+      if (state.completedCount > 0 && !this.provider.get(KEYS.assignments)) {
+        const a = {};
+        const base = this._getBaseWords();
+        for (let d = 1; d <= state.completedCount; d++) {
+          a[d] = base.slice((d - 1) * WORDS_PER_DAY, d * WORDS_PER_DAY)
+                     .map(function (w) { return w.id; });
+        }
+        this._saveAssignments(a);
+      }
     }
 
     /* ---------- 오답노트 ---------- */
@@ -168,9 +238,10 @@
     exportAll() {
       return {
         app: "vocaloop",
-        version: 1,
+        version: 2,
         exportedAt: new Date().toISOString(),
         state: this.provider.get(KEYS.state),
+        assignments: this.provider.get(KEYS.assignments),
         wrong: this.provider.get(KEYS.wrong),
         results: this.provider.get(KEYS.results),
         customWords: this.provider.get(KEYS.customWords),
@@ -180,10 +251,13 @@
     importAll(data) {
       if (!data || data.app !== "vocaloop") throw new Error("VocaLoop 백업 파일이 아닙니다.");
       if (data.state) this.provider.set(KEYS.state, data.state);
+      if (data.assignments) this.provider.set(KEYS.assignments, data.assignments);
       if (data.wrong) this.provider.set(KEYS.wrong, data.wrong);
       if (data.results) this.provider.set(KEYS.results, data.results);
       if (data.customWords) this.provider.set(KEYS.customWords, data.customWords);
       if (data.library) this.provider.set(KEYS.library, data.library);
+      // v1 백업(배정표 없음) 호환
+      this.migrateLegacyAssignments(this.loadState());
     }
     resetAll() {
       Object.keys(KEYS).forEach((k) => this.provider.remove(KEYS[k]));

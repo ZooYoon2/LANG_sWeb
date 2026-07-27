@@ -86,7 +86,7 @@
         '<div class="card q-card">' +
           '<div class="q-prompt-label">' + (isMC ? "이 단어의 뜻은?" : "이 뜻의 영단어를 입력") + "</div>" +
           '<div class="q-prompt' + (isMC ? "" : " kr") + '">' + esc(q.prompt) + "</div>" +
-          (q.item.pos ? '<span class="chip pos">' + esc(q.item.pos) + "</span>" : "") +
+          (q.item.posLabel ? '<span class="chip pos">' + esc(q.item.posLabel) + "</span>" : "") +
           (isMC
             ? '<ul class="choices">' +
                 q.choices.map(function (c, i) {
@@ -105,14 +105,18 @@
       const feedback = container.querySelector("#q-feedback");
 
       function finishQuestion(correct, correctLabel) {
+        const Speech = window.Features.Speech;
+        const listenHTML = " " + Speech.buttonHTML(q.item.word); // 채점 후에만 노출
         if (correct) {
           score += 1;
-          feedback.innerHTML = '<div class="feedback ok">정답!</div>';
+          feedback.innerHTML = '<div class="feedback ok">정답!' + listenHTML + "</div>";
         } else {
           wrongItems.push(q.item);
           feedback.innerHTML =
-            '<div class="feedback no">오답 — 정답: <span class="ans">' + esc(correctLabel) + "</span></div>";
+            '<div class="feedback no">오답 — 정답: <span class="ans">' + esc(correctLabel) + "</span>" +
+            listenHTML + "</div>";
         }
+        Speech.bindAll(feedback);
         nextBtn.disabled = false;
         nextBtn.textContent = idx + 1 === cfg.questions.length ? "결과 보기" : "다음";
         nextBtn.focus();
@@ -172,11 +176,13 @@
         (wrongItems.length
           ? '<div class="card"><p class="muted" style="margin-bottom:6px">틀린 단어</p><ul class="wrong-list">' +
               wrongItems.map(function (w) {
-                return "<li><span class='w'>" + esc(w.word) + "</span><span class='m'>" + esc(w.meaning) + "</span></li>";
+                return "<li>" + window.Features.Speech.buttonHTML(w.word) +
+                  "<span class='w'>" + esc(w.word) + "</span><span class='m'>" + esc(w.meaning) + "</span></li>";
               }).join("") +
             "</ul></div>"
           : "") +
         '<button class="btn" id="q-done">계속</button>';
+      window.Features.Speech.bindAll(container);
       container.querySelector("#q-done").addEventListener("click", function () {
         cfg.onFinish({ score: score, total: total, wrongItems: wrongItems });
       });

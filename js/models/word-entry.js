@@ -1,40 +1,46 @@
 /* ============================================================
  * WordEntry — 영단어 콘텐츠 (ContentItem 상속)
- * 데이터 파일(배열)이나 콘텐츠 팩(JSON)을 클래스 인스턴스로
- * 변환해서 사용한다. (코드 내에서는 항상 클래스로 다룸)
+ * 데이터(JSON)를 클래스 인스턴스로 변환해서 사용한다.
+ * Day 배정은 데이터에 없고, 배정표(repository)가 관리한다.
  * ============================================================ */
 (function () {
   "use strict";
 
   const ContentItem = window.Models.ContentItem;
 
+  /** 품사 코드 → 한글 표기 (표시 계층 전용, 데이터는 코드 유지) */
+  const POS_LABELS = {
+    n: "명사", v: "동사", adj: "형용사", adv: "부사",
+    prep: "전치사", conj: "접속사", pron: "대명사",
+    int: "감탄사", phr: "숙어", aux: "조동사",
+  };
+
   class WordEntry extends ContentItem {
     /**
      * @param {Object} p
-     * @param {string} p.word     영단어
-     * @param {string} p.meaning  한국어 뜻
-     * @param {string} [p.pos]    품사 (n, v, adj, adv ...)
-     * @param {string} [p.example] 예문
-     * @param {number} p.day      배정된 학습 Day
+     * @param {string} p.word      영단어
+     * @param {string} p.meaning   한국어 뜻
+     * @param {string} [p.pos]     품사 코드 (n, v, adj ...)
+     * @param {string} [p.phonetic] 발음 기호 (선택)
+     * @param {string} [p.example] 예문 (선택)
      */
     constructor(p) {
       super({ id: p.id, type: "word", tags: p.tags, createdAt: p.createdAt });
       this.word = p.word;
       this.meaning = p.meaning;
       this.pos = p.pos || "";
+      this.phonetic = p.phonetic || "";
       this.example = p.example || "";
-      this.day = p.day;
     }
 
-    /** 기본 데이터 파일의 압축 배열 [word, meaning, pos] → 클래스 */
-    static fromRaw(rawArr, index) {
-      return new WordEntry({
-        id: "base-" + index,
-        word: rawArr[0],
-        meaning: rawArr[1],
-        pos: rawArr[2] || "",
-        day: Math.floor(index / 30) + 1,
-      });
+    /** 품사 한글 표기. 모르는 코드는 원문 그대로 노출 */
+    get posLabel() {
+      return POS_LABELS[this.pos] || this.pos;
+    }
+
+    /** 기본 데이터 파일의 JSON 객체 → 클래스 (id는 배열 순번 기반) */
+    static fromRaw(obj, index) {
+      return new WordEntry(Object.assign({ id: "base-" + index }, obj));
     }
 
     /** 저장소/콘텐츠 팩의 JSON 객체 → 클래스 */
@@ -47,8 +53,8 @@
         word: this.word,
         meaning: this.meaning,
         pos: this.pos,
+        phonetic: this.phonetic,
         example: this.example,
-        day: this.day,
       });
     }
 
@@ -62,4 +68,5 @@
   }
 
   window.Models.WordEntry = WordEntry;
+  window.Models.POS_LABELS = POS_LABELS;
 })();

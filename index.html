@@ -268,6 +268,19 @@ pre.spec {
 .msg.ok { color: var(--good); }
 .msg.no { color: var(--bad); }
 
+/* ---------- 발음 듣기 ---------- */
+.speak-btn {
+  border: 1px solid var(--line); background: var(--card);
+  border-radius: 999px; padding: 3px 10px;
+  font-size: 15px; line-height: 1.4; cursor: pointer;
+  vertical-align: middle; flex: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.speak-btn:active { transform: scale(.94); }
+.word-row { display: flex; align-items: center; gap: 10px; justify-content: center; }
+.flashcard .phonetic { margin-top: 6px; color: var(--ink-soft); font-size: 15px; }
+.word-list li .speak-btn { margin-right: 2px; }
+
 /* ---------- 접근성 / 모션 ---------- */
 button:focus-visible, input:focus-visible, textarea:focus-visible {
   outline: 2px solid var(--ink); outline-offset: 2px;
@@ -290,6 +303,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible {
 <script src="js/storage/storage-interface.js"></script>
 <script src="js/storage/local-storage-provider.js"></script>
 <script src="js/storage/repository.js"></script>
+<script src="js/features/speech.js"></script>
 <script src="js/features/quiz.js"></script>
 <script src="js/features/study.js"></script>
 <script src="js/features/wrongnote.js"></script>

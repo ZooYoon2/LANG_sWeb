@@ -42,8 +42,8 @@
             const w = wordMap[n.itemId];
             return (
               '<div class="note-item">' +
-                "<div><div class='w'>" + esc(w.word) + "</div>" +
-                "<div class='m'>" + esc(w.meaning) +
+                "<div><div class='w'>" + esc(w.word) + " " + window.Features.Speech.buttonHTML(w.word) + "</div>" +
+                "<div class='m'>" + (w.posLabel ? "[" + esc(w.posLabel) + "] " : "") + esc(w.meaning) +
                 (n.sources.length ? " · " + n.sources.map(function (s) { return SOURCE_LABEL[s] || s; }).join(", ") : "") +
                 "</div></div>" +
                 '<div class="right">' +
@@ -59,6 +59,7 @@
             '<p class="muted">시험에서 틀린 단어가 여기에 자동으로 기록됩니다.</p>' +
           "</div>");
     app.bindBack("home");
+    window.Features.Speech.bindAll(app.el);
 
     const retryBtn = app.el.querySelector("#retry-btn");
     if (retryBtn) {
