@@ -15,6 +15,8 @@
 - 오늘의 30개는 **아직 안 배운 단어에서 무작위로** 뽑혀 그날에 고정 배정됩니다.
   (복습·주간시험 범위가 흔들리지 않도록 한 번 배정되면 바뀌지 않습니다)
 - 시험은 절반 **영→뜻 4지선다**, 절반 **뜻→영 타이핑**으로 출제됩니다.
+- 여러 뜻이 있는 단어는 4지선다 보기에 **뜻 1개만** 나옵니다 (주요 뜻 70% 확률).
+  오답 보기에는 정답 단어와 뜻이 겹치는 단어가 나오지 않습니다.
 - 학습 카드·목록·오답노트·채점 결과에서 🔊 버튼으로 발음을 들을 수 있습니다.
   (브라우저 내장 음성 사용 — 기기별로 목소리가 다를 수 있습니다)
 - 7일 완료마다 지금까지 배운 단어 중 **랜덤 50문제 주간시험**이 열립니다.
@@ -60,11 +62,13 @@
 
 ```jsonc
 // 단어 팩 — 미학습 풀에 들어가 이후 학습에 무작위로 등장합니다
+// meanings: 뜻 배열, 첫 번째가 주요 뜻 (시험 보기에 더 자주 출제)
+// 중복 처리: 이미 있는 단어는 제외, 새로운 뜻이면 기존 단어에 병합
 // pos 코드: n(명사) v(동사) adj(형용사) adv(부사) → 화면에는 한글로 표시
 // phonetic(발음 기호), example(예문)은 선택 항목
 { "packType": "words", "title": "추가 단어 팩",
-  "items": [ { "word": "negotiate", "meaning": "협상하다", "pos": "v",
-               "phonetic": "/nɪˈɡoʊʃieɪt/", "example": "..." } ] }
+  "items": [ { "word": "address", "meanings": ["다루다", "연설하다", "주소"], "pos": "v",
+               "phonetic": "/əˈdres/", "example": "..." } ] }
 
 // 문법 팩 — 라이브러리에서 열람
 { "packType": "grammar", "title": "핵심 문법",
@@ -115,11 +119,13 @@ vocaloop/
 | `vocaloop.assignments` | `{ "1": [단어id...], "2": [...] }` — Day별 배정표 |
 | `vocaloop.wrong` | `[{ itemId, wrongCount, lastWrongDate, sources }]` |
 | `vocaloop.results` | `[{ id, quizType, day, date, score, total, wrongItemIds }]` |
-| `vocaloop.customWords` | `[{ id, word, meaning, pos, phonetic, example, ... }]` |
+| `vocaloop.customWords` | `[{ id, word, meanings[], pos, phonetic, example, ... }]` |
+| `vocaloop.wordExtras` | `{ 단어id: { meanings: [병합된 추가 뜻] } }` |
 | `vocaloop.library` | 문법/토익 항목 배열 |
 
 단어 원본(`js/data/words.js`)도 같은 규격의 JSON 객체 배열입니다:
-`{ "word": "...", "meaning": "...", "pos": "v", "phonetic": "..."(선택) }`
+`{ "word": "...", "meanings": ["주요 뜻", "..."], "pos": "v", "phonetic": "..."(선택) }`
+(구버전 `meaning` 문자열도 읽을 때 자동으로 배열로 변환됩니다)
 
 ## 나중에 확장하려면
 

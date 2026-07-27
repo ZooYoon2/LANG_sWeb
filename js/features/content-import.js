@@ -20,14 +20,15 @@
     "- packType: words (또는 grammar / toeic)\n" +
     "- 토익/토플 빈출 단어 30개, 이미 준 단어와 중복 없이\n" +
     "- 아래 JSON 형식 그대로, 다른 텍스트 없이 출력\n" +
-    "- pos 코드: n(명사) v(동사) adj(형용사) adv(부사)\n\n" +
+    "- pos 코드: n(명사) v(동사) adj(형용사) adv(부사)\n" +
+    "- meanings는 뜻 배열이고 첫 번째가 주요 뜻\n\n" +
     '{\n  "packType": "words",\n  "title": "추가 단어 팩",\n  "items": [\n' +
-    '    { "word": "negotiate", "meaning": "협상하다", "pos": "v",\n' +
-    '      "phonetic": "/nɪˈɡoʊʃieɪt/", "example": "We negotiated a better price." }\n' +
+    '    { "word": "address", "meanings": ["다루다", "연설하다", "주소"], "pos": "v",\n' +
+    '      "phonetic": "/\u0259\u02c8dres/", "example": "We must address this issue." }\n' +
     "  ]\n}";
 
   const SPEC_TEXT =
-    '// 단어 팩 (phonetic·example은 선택)\n{ "packType": "words", "title": "...",\n  "items": [ { "word": "...", "meaning": "...", "pos": "v", "phonetic": "/.../", "example": "..." } ] }\n\n' +
+    '// 단어 팩 — meanings[0]이 주요 뜻 (phonetic·example은 선택)\n// 이미 있는 단어는 자동 제외, 새로운 뜻이면 기존 단어에 병합\n{ "packType": "words", "title": "...",\n  "items": [ { "word": "...", "meanings": ["주요 뜻", "다른 뜻"], "pos": "v", "phonetic": "/.../", "example": "..." } ] }\n\n' +
     '// 문법 팩\n{ "packType": "grammar", "title": "...",\n  "items": [ { "title": "...", "explanation": "...", "examples": ["..."] } ] }\n\n' +
     '// 토익 문제 팩\n{ "packType": "toeic", "title": "...",\n  "items": [ { "question": "...", "choices": ["A","B","C","D"], "answer": 0, "explanation": "..." } ] }';
 
@@ -59,17 +60,29 @@
     // 타입별 저장
     if (data.packType === "words") {
       const r = repo.appendWordPack(data.items);
-      return { ok: true, msg: "단어 " + r.added + "개 추가 완료. 앞으로의 학습에 무작위로 등장합니다." };
+      const parts = [];
+      if (r.added) parts.push(r.added + "개 추가");
+      if (r.merged) parts.push(r.merged + "개는 기존 단어에 뜻 보강");
+      if (r.skipped) {
+        const names = r.skippedWords.slice(0, 8).join(", ") +
+          (r.skippedWords.length > 8 ? " 외 " + (r.skippedWords.length - 8) + "개" : "");
+        parts.push(r.skipped + "개는 이미 있어 제외 (" + names + ")");
+      }
+      if (!r.added && !r.merged) return { ok: false, msg: "전부 이미 있는 단어입니다. " + parts.join(", ") };
+      return { ok: true, msg: "단어 팩 처리 완료: " + parts.join(", ") };
     }
     const stamp = Date.now();
     const items = data.items.map(function (it, i) {
       const base = Object.assign({ id: data.packType + "-" + stamp + "-" + i }, it);
       return data.packType === "grammar" ? new M.GrammarItem(base) : new M.ToeicQuestion(base);
     });
-    repo.appendLibrary(items);
+    const lr = repo.appendLibrary(items);
+    const label = data.packType === "grammar" ? "문법" : "토익 문제";
+    if (!lr.added) return { ok: false, msg: label + " 전부 이미 있어 추가하지 않았습니다." };
     return {
       ok: true,
-      msg: (data.packType === "grammar" ? "문법" : "토익 문제") + " " + items.length + "개 추가 완료. 라이브러리에서 볼 수 있어요.",
+      msg: label + " " + lr.added + "개 추가" +
+        (lr.skipped ? " (" + lr.skipped + "개는 중복 제외)" : "") + ". 라이브러리에서 볼 수 있어요.",
     };
   }
 

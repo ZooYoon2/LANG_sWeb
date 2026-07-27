@@ -21,6 +21,7 @@
     wrong: "vocaloop.wrong",
     results: "vocaloop.results",
     customWords: "vocaloop.customWords",
+    wordExtras: "vocaloop.wordExtras", // 기존 단어에 병합된 추가 뜻 { 단어id: { meanings: [...] } }
     library: "vocaloop.library", // 문법/토익 등 확장 콘텐츠
   };
 
@@ -61,9 +62,18 @@
       const arr = this.provider.get(KEYS.customWords) || [];
       return arr.map((o) => M.WordEntry.fromJSON(o));
     }
-    /** 전체 단어 (기본 + 추가) */
+    /** 전체 단어 (기본 + 추가). 병합된 추가 뜻(wordExtras)을 반영한다 */
     getAllWords() {
-      return this._getBaseWords().concat(this._getCustomWords());
+      const extras = this.provider.get(KEYS.wordExtras) || {};
+      return this._getBaseWords().concat(this._getCustomWords()).map(function (w) {
+        const ex = extras[w.id];
+        if (ex && Array.isArray(ex.meanings)) {
+          ex.meanings.forEach(function (m) {
+            if (w.meanings.indexOf(m) === -1) w.meanings.push(m);
+          });
+        }
+        return w;
+      });
     }
     /** id → WordEntry 맵 */
     getWordMap() {
@@ -72,25 +82,69 @@
       return map;
     }
     /**
-     * 단어 팩 추가: 미배정 풀에 넣기만 하면 이후 학습에 무작위 등장
-     * @param {Array<Object>} items [{word, meaning, pos, phonetic, example}]
-     * @returns {{added:number}}
+     * 단어 팩 추가 (중복 차단 + 뜻 병합)
+     *  - 새 단어      → 추가 (미배정 풀에 들어가 이후 무작위 등장)
+     *  - 이미 있는 단어 + 새로운 뜻 → 기존 단어에 뜻 보강 (병합)
+     *  - 이미 있는 단어 + 같은 뜻   → 제외
+     * @param {Array<Object>} items [{word, meanings|meaning, pos, phonetic, example}]
+     * @returns {{added:number, merged:number, skipped:number, skippedWords:string[]}}
      */
     appendWordPack(items) {
       const arr = this.provider.get(KEYS.customWords) || [];
+      const extras = this.provider.get(KEYS.wordExtras) || {};
       const stamp = Date.now();
+      const norm = function (w) { return String(w).trim().toLowerCase(); };
+
+      // 기존 단어 색인: 소문자 단어 → WordEntry (병합된 뜻 포함 상태)
+      const index = {};
+      this.getAllWords().forEach(function (w) { index[norm(w.word)] = w; });
+
+      let added = 0, merged = 0;
+      const skippedWords = [];
+
       items.forEach(function (it, i) {
-        arr.push(new M.WordEntry({
-          id: "cust-" + stamp + "-" + i,
-          word: it.word.trim(),
-          meaning: it.meaning.trim(),
-          pos: (it.pos || "").trim(),
-          phonetic: (it.phonetic || "").trim(),
-          example: (it.example || "").trim(),
-        }).toJSON());
+        const key = norm(it.word);
+        const meanings = Array.isArray(it.meanings) && it.meanings.length
+          ? it.meanings.map(function (m) { return String(m).trim(); }).filter(Boolean)
+          : M.parseMeanings(it.meaning);
+        const found = index[key];
+
+        if (!found) {
+          // 새 단어 추가 (팩 안 중복도 색인에 넣어 차단)
+          const entry = new M.WordEntry({
+            id: "cust-" + stamp + "-" + i,
+            word: it.word.trim(),
+            meanings: meanings,
+            pos: (it.pos || "").trim(),
+            phonetic: (it.phonetic || "").trim(),
+            example: (it.example || "").trim(),
+          });
+          arr.push(entry.toJSON());
+          index[key] = entry;
+          added += 1;
+          return;
+        }
+
+        // 이미 있는 단어: 새로운 뜻만 골라내기
+        const newMeanings = meanings.filter(function (m) {
+          return found.meanings.indexOf(m) === -1;
+        });
+        if (newMeanings.length) {
+          const ex = extras[found.id] || { meanings: [] };
+          newMeanings.forEach(function (m) {
+            if (ex.meanings.indexOf(m) === -1) ex.meanings.push(m);
+          });
+          extras[found.id] = ex;
+          newMeanings.forEach(function (m) { found.meanings.push(m); }); // 색인도 갱신
+          merged += 1;
+        } else {
+          skippedWords.push(it.word.trim());
+        }
       });
+
       this.provider.set(KEYS.customWords, arr);
-      return { added: items.length };
+      this.provider.set(KEYS.wordExtras, extras);
+      return { added: added, merged: merged, skipped: skippedWords.length, skippedWords: skippedWords };
     }
 
     /* ---------- Day 배정표 ---------- */
@@ -228,10 +282,24 @@
         return null;
       }).filter(Boolean);
     }
+    /** 확장 콘텐츠 추가 (중복 차단: 문법=title, 토익=question 기준) */
     appendLibrary(items) {
       const arr = this.provider.get(KEYS.library) || [];
-      items.forEach((it) => arr.push(it.toJSON()));
+      const norm = function (s) { return String(s || "").trim().toLowerCase(); };
+      const seen = {};
+      arr.forEach(function (o) {
+        seen[o.type + "|" + norm(o.type === "grammar" ? o.title : o.question)] = true;
+      });
+      let added = 0, skipped = 0;
+      items.forEach(function (it) {
+        const key = it.type + "|" + norm(it.type === "grammar" ? it.title : it.question);
+        if (seen[key]) { skipped += 1; return; }
+        seen[key] = true;
+        arr.push(it.toJSON());
+        added += 1;
+      });
       this.provider.set(KEYS.library, arr);
+      return { added: added, skipped: skipped };
     }
 
     /* ---------- 백업 ---------- */
@@ -245,6 +313,7 @@
         wrong: this.provider.get(KEYS.wrong),
         results: this.provider.get(KEYS.results),
         customWords: this.provider.get(KEYS.customWords),
+        wordExtras: this.provider.get(KEYS.wordExtras),
         library: this.provider.get(KEYS.library),
       };
     }
@@ -255,6 +324,7 @@
       if (data.wrong) this.provider.set(KEYS.wrong, data.wrong);
       if (data.results) this.provider.set(KEYS.results, data.results);
       if (data.customWords) this.provider.set(KEYS.customWords, data.customWords);
+      if (data.wordExtras) this.provider.set(KEYS.wordExtras, data.wordExtras);
       if (data.library) this.provider.set(KEYS.library, data.library);
       // v1 백업(배정표 없음) 호환
       this.migrateLegacyAssignments(this.loadState());

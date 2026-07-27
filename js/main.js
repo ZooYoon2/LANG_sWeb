@@ -23,6 +23,7 @@
         case "import": F.ContentImport.render(App); break;
         case "library": F.ContentImport.renderLibrary(App); break;
         case "backup": F.Backup.render(App); break;
+        case "changelog": F.Changelog.render(App); break;
         default: renderHome();
       }
     },
@@ -110,8 +111,9 @@
           '<li><button data-nav="backup">백업 · 설정<span class="arrow">›</span></button></li>' +
         "</ul>" +
       "</div>" +
-      '<p class="muted center" style="margin-top:16px">VocaLoop v' +
-        window.VocaData.APP_VERSION + " (" + window.VocaData.APP_VERSION_DATE + ")</p>";
+      '<button class="version-link" data-nav="changelog" aria-label="릴리즈 노트 보기">' +
+        "VocaLoop v" + window.VocaData.APP_VERSION + " (" + window.VocaData.APP_VERSION_DATE + ") ›" +
+      "</button>";
 
     const startBtn = App.el.querySelector("#btn-start");
     if (startBtn) startBtn.addEventListener("click", function () { App.navigate("study"); });

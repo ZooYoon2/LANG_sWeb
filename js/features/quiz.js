@@ -2,7 +2,12 @@
  * Quiz — 시험 기능
  *  - buildWordQuiz : 단어 목록 → 문제 배열 (절반 4지선다, 절반 타이핑)
  *  - renderQuiz    : 재사용 가능한 시험 화면 (일일/주간/오답 재시험 공용)
- * 새 콘텐츠 타입의 시험이 필요하면 build 함수를 추가하는 구조.
+ *
+ * 다중 뜻 출제 규칙:
+ *  - 4지선다 정답 보기: 뜻 1개만 표시 (주요 뜻 70%, 나머지 뜻 30%)
+ *  - 오답 보기: 정답 단어와 뜻이 하나라도 겹치는 단어는 제외
+ *               (정답이 2개가 되는 사고 방지), 보기 문구 중복도 방지
+ *  - 뜻→영 타이핑: 모든 뜻을 함께 표시 (동의어 혼동 방지)
  * ============================================================ */
 (function () {
   "use strict";
@@ -24,6 +29,15 @@
     d.textContent = s == null ? "" : String(s);
     return d.innerHTML;
   }
+  /** 뜻 1개 선택: 주요 뜻 70%, 나머지 뜻 30% */
+  function pickMeaning(w) {
+    if (w.meanings.length <= 1 || Math.random() < 0.7) return w.meanings[0];
+    return w.meanings[1 + Math.floor(Math.random() * (w.meanings.length - 1))];
+  }
+  /** 두 단어의 뜻이 하나라도 겹치는가 */
+  function meaningsOverlap(a, b) {
+    return a.meanings.some(function (m) { return b.meanings.indexOf(m) !== -1; });
+  }
 
   /* ---------- 문제 생성 ---------- */
   /**
@@ -35,23 +49,30 @@
   function buildWordQuiz(words, pool) {
     const shuffled = shuffle(words);
     const half = Math.ceil(shuffled.length / 2);
-    const questions = shuffled.map((w, idx) => {
+    const questions = shuffled.map(function (w, idx) {
       if (idx < half) {
-        // 영→뜻 4지선다
-        const wrongMeanings = sample(
-          pool.filter((p) => p.id !== w.id && p.meaning !== w.meaning),
-          3
-        ).map((p) => p.meaning);
-        const choices = shuffle([w.meaning].concat(wrongMeanings));
+        // 영→뜻 4지선다: 정답 보기는 뜻 1개만 (여러 뜻 나열은 정답 티가 남)
+        const correctText = pickMeaning(w);
+        const used = { [correctText]: true };
+        const wrongTexts = [];
+        shuffle(pool).some(function (p) {
+          if (p.id === w.id || meaningsOverlap(p, w)) return false;
+          const t = pickMeaning(p);
+          if (used[t]) return false;
+          used[t] = true;
+          wrongTexts.push(t);
+          return wrongTexts.length === 3;
+        });
+        const choices = shuffle([correctText].concat(wrongTexts));
         return {
           kind: "mc",
           item: w,
           prompt: w.word,
           choices: choices,
-          answerIndex: choices.indexOf(w.meaning),
+          answerIndex: choices.indexOf(correctText),
         };
       }
-      // 뜻→영 타이핑
+      // 뜻→영 타이핑: 모든 뜻을 보여줘야 동의어 혼동이 없다
       return {
         kind: "type",
         item: w,
@@ -148,7 +169,6 @@
         input.addEventListener("keydown", function (e) {
           if (e.key === "Enter") submit();
         });
-        // 입력 후 화면 아무 곳 대신 명시적 확인 버튼 제공
         const box = container.querySelector(".type-box");
         const okBtn = document.createElement("button");
         okBtn.className = "btn small";

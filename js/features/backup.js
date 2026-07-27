@@ -32,8 +32,10 @@
         '<p class="muted">모든 학습 데이터를 지우고 처음부터 시작합니다. 되돌릴 수 없습니다.</p>' +
         '<button class="btn danger" id="do-reset">전체 초기화</button>' +
       "</div>" +
-      '<p class="muted center">현재 실행 중인 버전: v' +
-        window.VocaData.APP_VERSION + " (" + window.VocaData.APP_VERSION_DATE + ")</p>";
+      '<button class="version-link" id="to-changelog" aria-label="릴리즈 노트 보기">' +
+        "현재 실행 중인 버전: v" + window.VocaData.APP_VERSION +
+        " (" + window.VocaData.APP_VERSION_DATE + ") ›" +
+      "</button>";
     app.bindBack("home");
 
     app.el.querySelector("#do-export").addEventListener("click", function () {
@@ -72,6 +74,9 @@
       repo.resetAll();
       app.state = repo.loadState();
       app.navigate("home");
+    });
+    app.el.querySelector("#to-changelog").addEventListener("click", function () {
+      app.navigate("changelog");
     });
   }
 
