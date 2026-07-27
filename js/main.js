@@ -109,7 +109,9 @@
           '<li><button data-nav="library">라이브러리 (문법 · 토익)<span class="arrow">›</span></button></li>' +
           '<li><button data-nav="backup">백업 · 설정<span class="arrow">›</span></button></li>' +
         "</ul>" +
-      "</div>";
+      "</div>" +
+      '<p class="muted center" style="margin-top:16px">VocaLoop v' +
+        window.VocaData.APP_VERSION + " (" + window.VocaData.APP_VERSION_DATE + ")</p>";
 
     const startBtn = App.el.querySelector("#btn-start");
     if (startBtn) startBtn.addEventListener("click", function () { App.navigate("study"); });

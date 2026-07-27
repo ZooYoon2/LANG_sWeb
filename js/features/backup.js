@@ -31,7 +31,9 @@
       '<div class="card stack">' +
         '<p class="muted">모든 학습 데이터를 지우고 처음부터 시작합니다. 되돌릴 수 없습니다.</p>' +
         '<button class="btn danger" id="do-reset">전체 초기화</button>' +
-      "</div>";
+      "</div>" +
+      '<p class="muted center">현재 실행 중인 버전: v' +
+        window.VocaData.APP_VERSION + " (" + window.VocaData.APP_VERSION_DATE + ")</p>";
     app.bindBack("home");
 
     app.el.querySelector("#do-export").addEventListener("click", function () {
